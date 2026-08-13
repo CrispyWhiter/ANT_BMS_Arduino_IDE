@@ -1,9 +1,0 @@
-建议依赖版本
-===================
-- Arduino-ESP32：3.x
-- NimBLE-Arduino：2.x
-- LVGL：8.4.x
-- LovyanGFX：与当前 Arduino-ESP32 兼容的稳定版
-
-说明：代码使用 NimBLE-Arduino 2.x 的 ScanCallbacks、isAdvertisingService、
-getCharacteristics、特征属性判断和 notify/indicate 订阅接口。

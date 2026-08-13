@@ -1,0 +1,1 @@
+7d7b4f25707d051232003e23a9bfcd87ae40422b864e1f17ff50e250247870b1  release/BMS_UI_Designer_v1.1.0.exe
