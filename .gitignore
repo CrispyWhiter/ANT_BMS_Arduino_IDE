@@ -15,6 +15,9 @@ build/
 designer/*.exe
 designer/*.zip
 
+# Themes
+主题/
+
 # Arduino generated files
 .arduinoIDE/
 arduino_build_*/
