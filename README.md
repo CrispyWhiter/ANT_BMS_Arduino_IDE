@@ -35,18 +35,30 @@ v1.1.0 的设备主题协议为 **BMSUI v7**，固件继续兼容读取 v1–v6 
 
 ## 硬件引脚
 
+这部分我根据个人习惯修改过，和原项目有区别
+
 | 功能 | GPIO |
 |---|---:|
-| TFT CS | 10 |
-| TFT RST | 9 |
-| TFT DC | 8 |
-| TFT MOSI | 11 |
-| TFT SCLK | 12 |
-| TFT MISO | 13 |
-| TFT 背光 | 7 |
+| TFT CS | 13 |
+| TFT RST | 12 |
+| TFT DC | 11 |
+| TFT MOSI | 10 |
+| TFT SCLK | 9 |
+| TFT MISO | 3 |
+| TFT 背光 | 7 | 默认高电平有效
 | 用户按键 | 6 |
 
 完整参数集中在 `firmware/src/app_config.h`。
+
+## 屏幕参数
+
+`firmware/src/display_ui.cpp`:
+config.offset_rotation  控制屏幕旋转
+
+`firmware/src/app_config.h`:
+constexpr bool InvertColors 控制屏幕颜色翻转
+
+其他参数自行按字面意思测试即可
 
 ## 快速开始
 
