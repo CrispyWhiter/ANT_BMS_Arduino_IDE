@@ -1,3 +1,6 @@
+# This is a fork
+将firmware部分迁移到PlatformIO
+
 # BMS UI Designer + ESP32-S3 Dynamic UI
 
 **版本：v1.1.0**  
