@@ -53,9 +53,11 @@ v1.1.0 的设备主题协议为 **BMSUI v7**，固件继续兼容读取 v1–v6 
 ## 屏幕参数
 
 `firmware/src/display_ui.cpp`:
+
 config.offset_rotation  控制屏幕旋转
 
 `firmware/src/app_config.h`:
+
 constexpr bool InvertColors 控制屏幕颜色翻转
 
 其他参数自行按字面意思测试即可
