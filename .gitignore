@@ -19,6 +19,9 @@ designer/*.zip
 .arduinoIDE/
 arduino_build_*/
 
+# PlatformIO build directory
+.pio/
+
 # Keep release artifacts tracked when desired
 !release/*.exe
 

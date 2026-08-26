@@ -1,8 +1,8 @@
 #include "display_ui.h"
 
 #include <LovyanGFX.hpp>
-#include "lv_conf.h"
 #include <lvgl.h>
+
 #include <esp_arduino_version.h>
 
 #if LVGL_VERSION_MAJOR != 8
