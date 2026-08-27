@@ -14,16 +14,47 @@ constexpr char Developer[] = "无用脑洞研究所";
 }
 
 // Board wiring. Change only when the physical ESP32-S3/TFT wiring changes.
+//
+// 每个引脚都提供可被 PlatformIO env 覆盖的默认值：env 在 build_flags 里传
+//   -DANT_BMS_PIN_xxx=<引脚号>
+// 即可覆盖（例如 -DANT_BMS_PIN_TFT_CS=5）。默认值对应常见 ESP32-S3 开发板。
 namespace Pins {
-constexpr int TftCs = 13;
-constexpr int TftReset = 12;
-constexpr int TftDc = 11;
-constexpr int TftMosi = 10;
-constexpr int TftSclk = 9;
-constexpr int TftMiso = 3;
-constexpr int TftBacklight = 7;
-constexpr uint8_t TftBacklightOn = HIGH;
-constexpr int UserButton = 6;
+#ifndef ANT_BMS_PIN_TFT_CS
+#define ANT_BMS_PIN_TFT_CS 13
+#endif
+#ifndef ANT_BMS_PIN_TFT_RESET
+#define ANT_BMS_PIN_TFT_RESET 12
+#endif
+#ifndef ANT_BMS_PIN_TFT_DC
+#define ANT_BMS_PIN_TFT_DC 11
+#endif
+#ifndef ANT_BMS_PIN_TFT_MOSI
+#define ANT_BMS_PIN_TFT_MOSI 10
+#endif
+#ifndef ANT_BMS_PIN_TFT_SCLK
+#define ANT_BMS_PIN_TFT_SCLK 9
+#endif
+#ifndef ANT_BMS_PIN_TFT_MISO
+#define ANT_BMS_PIN_TFT_MISO 3
+#endif
+#ifndef ANT_BMS_PIN_TFT_BACKLIGHT
+#define ANT_BMS_PIN_TFT_BACKLIGHT 7
+#endif
+#ifndef ANT_BMS_PIN_TFT_BACKLIGHT_ON
+#define ANT_BMS_PIN_TFT_BACKLIGHT_ON HIGH
+#endif
+#ifndef ANT_BMS_PIN_USER_BUTTON
+#define ANT_BMS_PIN_USER_BUTTON 6
+#endif
+constexpr int TftCs = ANT_BMS_PIN_TFT_CS;
+constexpr int TftReset = ANT_BMS_PIN_TFT_RESET;
+constexpr int TftDc = ANT_BMS_PIN_TFT_DC;
+constexpr int TftMosi = ANT_BMS_PIN_TFT_MOSI;
+constexpr int TftSclk = ANT_BMS_PIN_TFT_SCLK;
+constexpr int TftMiso = ANT_BMS_PIN_TFT_MISO;
+constexpr int TftBacklight = ANT_BMS_PIN_TFT_BACKLIGHT;
+constexpr uint8_t TftBacklightOn = ANT_BMS_PIN_TFT_BACKLIGHT_ON;
+constexpr int UserButton = ANT_BMS_PIN_USER_BUTTON;
 }
 
 // ST7789 geometry, SPI timing, color order, reset timing, and backlight PWM.
