@@ -64,7 +64,7 @@ constexpr bool InvertColors 控制屏幕颜色翻转
 
 ## 快速开始
 
-1. 用 Arduino IDE 打开 `firmware/ANT_BMS_Arduino_IDE.ino` 并烧录到目标 ESP32-S3。
+1. 用 Arduino IDE 打开 `firmware/ANT_BMS_Arduino_IDE.ino` 并烧录到目标 ESP32-S3 ; 或者用vscode+platformio打开`firmware_pio`工程，自行构建并烧录，本fork仓库仅维护此工程
 2. 长按用户按键 10 秒，设备重启进入配置/UI 热点。
 3. 电脑连接热点 `无用脑洞研究所`，设备地址为 `192.168.4.1`。
 4. 运行 `release/BMS_UI_Designer_v1.1.0.exe`。
