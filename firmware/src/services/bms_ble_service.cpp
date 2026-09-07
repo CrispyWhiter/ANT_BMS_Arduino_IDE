@@ -203,8 +203,9 @@ bool isAntDeviceName(const std::string &name) {
 
 bool isJikongDeviceName(const std::string &name) {
   if (name.size() < 2U) return false;
-  return tolower(static_cast<unsigned char>(name[0])) == 'j' &&
-         tolower(static_cast<unsigned char>(name[1])) == 'k';
+  // return tolower(static_cast<unsigned char>(name[0])) == 'j' &&
+  //        tolower(static_cast<unsigned char>(name[1])) == 'k';
+  return true;
 }
 
 bool isJiabaidaDeviceName(const std::string &name) {

@@ -31,3 +31,6 @@ arduino_build_*/
 # Python cache
 __pycache__/
 *.pyc
+
+# other
+参考项目/

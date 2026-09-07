@@ -40,6 +40,13 @@ int32_t readI32LE(const uint8_t *data, size_t index) {
   return static_cast<int32_t>(readU32LE(data, index));
 }
 
+float floatFromLe32(const uint8_t *data, size_t index) {
+  const uint32_t bits = readU32LE(data, index);
+  float value;
+  memcpy(&value, &bits, sizeof(value));
+  return value;
+}
+
 bool hasHeader(const uint8_t *data) {
   return data != nullptr && memcmp(data, kHeader, sizeof(kHeader)) == 0;
 }
@@ -87,6 +94,15 @@ int hardwareMajor(const char *version) {
   while (*version != '\0' && !isdigit(static_cast<unsigned char>(*version))) ++version;
   if (*version == '\0') return -1;
   return atoi(version);
+}
+
+const char *variantName(JkProtocolDecoder::Variant variant) {
+  switch (variant) {
+    case JkProtocolDecoder::Variant::Jk04: return "JK04";
+    case JkProtocolDecoder::Variant::Jk02_32S: return "JK02_32S";
+    case JkProtocolDecoder::Variant::Jk02_24S: return "JK02_24S";
+    default: return "auto";
+  }
 }
 
 }
@@ -365,6 +381,109 @@ JkProtocolDecoder::Candidate JkProtocolDecoder::parseStatusCandidate(
   return candidate;
 }
 
+JkProtocolDecoder::Candidate JkProtocolDecoder::parseStatusJk04(
+    const uint8_t *frame, Variant variant) const {
+  Candidate candidate;
+  candidate.variant = variant;
+  BmsData &data = candidate.data;
+
+  // JK04 cell-info 帧布局（参考 esphome-jk-bms 的 decode_jk04_cell_info_）：
+  //   Byte  Len  Content
+  //   0     4    Header 0x55 0xAA 0xEB 0x90
+  //   4     1    Frame type (0x02)
+  //   5     1    Frame counter
+  //   6     4    Cell voltage 01..24   (IEEE754 float, V)
+  //   102   4    Cell resistance 01..24（本工程不展示，仅保留读取能力）
+  //   202   4    Average cell voltage（参考注释）
+  //   206   4    Delta cell voltage（参考注释）
+  //   220   1    Balancing action（0=off, 1=charging balancer, 2=discharging balancer）
+  //   222   4    Balancing current（float, A）
+  //   286   4    Runtime（uint32, s）
+  //   299   1    CRC
+  constexpr uint8_t kCellSlotCount = 24U;
+
+  float sum = 0.0f;
+  float maximum = -1.0f;
+  float minimum = AppConfig::Protocol::MaxCellVoltage + 1.0f;
+  uint8_t validCells = 0U;
+  uint8_t suspiciousCells = 0U;
+  uint8_t plausibleFloatCells = 0U;
+
+  for (uint8_t i = 0; i < kCellSlotCount; ++i) {
+    const size_t offset = 6U + static_cast<size_t>(i) * 4U;
+    const float voltage = floatFromLe32(frame, offset);
+    if (!isfinite(voltage)) {
+      data.cells[i] = 0.0f;
+      continue;
+    }
+    data.cells[i] = voltage;
+    // 0.05V 以下视为未启用槽位（float 0.0 或噪音）
+    if (voltage < 0.05f) continue;
+    if (!finiteWithin(voltage,
+                      AppConfig::Protocol::MinCellVoltage,
+                      AppConfig::Protocol::MaxCellVoltage)) {
+      ++suspiciousCells;
+      continue;
+    }
+    ++validCells;
+    sum += voltage;
+    if (voltage > maximum) {
+      maximum = voltage;
+      data.maxCell = i + 1U;
+    }
+    if (voltage < minimum) {
+      minimum = voltage;
+      data.minCell = i + 1U;
+    }
+    // IEEE754 float 高位字节模式：2.x~4.x V 对应 0x40/0x3F/0x41 开头，
+    // 用于与 JK02（2 字节 mV）布局区分
+    const uint8_t highByte = frame[offset + 3U];
+    if (highByte >= 0x3FU && highByte <= 0x41U) ++plausibleFloatCells;
+  }
+
+  data.valid = true;
+  data.updatedAt = millis();
+
+  data.cellCount = validCells;
+  // JK04 帧内没有独立总压/电流/SOC 字段（参考项目亦如此），总压取单格之和
+  data.totalVoltage = sum;
+  data.current = 0.0f;
+  data.power = 0;
+  data.soc = 0;
+  data.soh = 0;
+  data.remainingCapacityAh = 0.0f;
+  data.totalCapacityAh = 0.0f;
+  data.cycleCapacityAh = 0.0f;
+  data.reportedCycleCount = 0;
+  data.totalRuntimeSeconds = readU32LE(frame, 286U);
+  data.chargeMos = 0U;
+  data.dischargeMos = 0U;
+  data.balancerStatus = frame[220U] != 0U;
+  data.balanceMask = 0U;
+  data.batteryType = 0U;
+  data.mosTemperature = 0;
+  data.temperatureCount = 0U;
+
+  if (validCells > 0U) {
+    data.maxCellVoltage = maximum;
+    data.minCellVoltage = minimum;
+    data.deltaCellVoltage = maximum - minimum;
+    data.averageCellVoltage = sum / static_cast<float>(validCells);
+  }
+
+  int score = 0;
+  if (validCells >= 2U && validCells <= kCellSlotCount) score += 8;
+  else score -= 12;
+  score -= suspiciousCells * 3;
+  if (validCells > 0U && plausibleFloatCells >= (validCells + 1U) / 2U) score += 6;
+  else score -= 6;
+  if (finiteWithin(data.totalVoltage, 1.0f, AppConfig::Protocol::MaxPackVoltage)) score += 6;
+  else score -= 12;
+
+  candidate.score = score;
+  return candidate;
+}
+
 bool JkProtocolDecoder::parseStatusFrame(const uint8_t *frame,
                                          size_t length,
                                          BmsData &data) {
@@ -374,18 +493,33 @@ bool JkProtocolDecoder::parseStatusFrame(const uint8_t *frame,
 
   const Candidate candidate24 = parseStatusCandidate(frame, Variant::Jk02_24S);
   const Candidate candidate32 = parseStatusCandidate(frame, Variant::Jk02_32S);
+  const Candidate candidate04 = parseStatusJk04(frame, Variant::Jk04);
 
   Candidate chosen;
-  if (detectedVariant_ == Variant::Jk02_24S) {
-    chosen = candidate32.score >= candidate24.score + 4
-                 ? candidate32
-                 : candidate24;
-  } else if (detectedVariant_ == Variant::Jk02_32S) {
-    chosen = candidate24.score >= candidate32.score + 4
-                 ? candidate24
-                 : candidate32;
-  } else {
-    chosen = candidate32.score > candidate24.score ? candidate32 : candidate24;
+  switch (detectedVariant_) {
+    case Variant::Jk04:
+      // 已锁定 JK04 后优先按 JK04 解析；分数过低才回退 JK02（几乎不会发生）
+      chosen = candidate04.score >= 2
+                   ? candidate04
+                   : (candidate32.score >= candidate24.score ? candidate32
+                                                             : candidate24);
+      break;
+    case Variant::Jk02_24S:
+      chosen = candidate32.score >= candidate24.score + 4
+                   ? candidate32
+                   : candidate24;
+      break;
+    case Variant::Jk02_32S:
+      chosen = candidate24.score >= candidate32.score + 4
+                   ? candidate24
+                   : candidate32;
+      break;
+    case Variant::Auto:
+    default:
+      chosen = candidate04;
+      if (candidate32.score > chosen.score) chosen = candidate32;
+      if (candidate24.score > chosen.score) chosen = candidate24;
+      break;
   }
 
   if (chosen.score >= 8 && chosen.variant != detectedVariant_) {
@@ -393,10 +527,9 @@ bool JkProtocolDecoder::parseStatusFrame(const uint8_t *frame,
     detectedVariant_ = chosen.variant;
     DiagnosticLog::printf(
         "JK protocol layout selected: %s (score=%d, previous=%s).\n",
-        detectedVariant_ == Variant::Jk02_32S ? "JK02_32S" : "JK02_24S",
+        variantName(detectedVariant_),
         chosen.score,
-        previous == Variant::Jk02_32S ? "JK02_32S" :
-        previous == Variant::Jk02_24S ? "JK02_24S" : "auto");
+        variantName(previous));
   }
 
   if (chosen.score < 2 || !chosen.data.valid || chosen.data.cellCount == 0U) {
@@ -426,10 +559,12 @@ bool JkProtocolDecoder::parseDeviceInfoFrame(const uint8_t *frame,
   const int major = hardwareMajor(hardwareVersion);
   if (major >= 11) detectedVariant_ = Variant::Jk02_32S;
   else if (major >= 6) detectedVariant_ = Variant::Jk02_24S;
+  else if (major >= 1) detectedVariant_ = Variant::Jk04;
 
   DiagnosticLog::printf("JK device info: HW=%s SW=%s layout=%s.\n",
                         hardwareVersion[0] == '\0' ? "unknown" : hardwareVersion,
                         softwareVersion[0] == '\0' ? "unknown" : softwareVersion,
+                        detectedVariant_ == Variant::Jk04 ? "JK04" :
                         detectedVariant_ == Variant::Jk02_32S ? "JK02_32S" :
                         detectedVariant_ == Variant::Jk02_24S ? "JK02_24S" : "auto");
   return hardwareVersion[0] != '\0' || softwareVersion[0] != '\0';

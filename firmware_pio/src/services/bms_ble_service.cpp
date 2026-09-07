@@ -235,12 +235,36 @@ bool advertisesService(const NimBLEAdvertisedDevice *device, const char *uuid) {
          device->isAdvertisingService(NimBLEUUID(uuid));
 }
 
+bool hasJikongMacOui(const std::string &address) {
+  // 极空 BLE 模块的 MAC OUI 前缀（参考 esphome-jk-bms 抓包注释）：
+  //   老 BLE 模块：C8:47:8C  新 BLE 模块：20:21:11
+  if (address.size() < 8U) return false;
+  std::string prefix;
+  prefix.reserve(8U);
+  for (size_t i = 0; i < 8U; ++i) {
+    prefix.push_back(static_cast<char>(tolower(static_cast<unsigned char>(address[i]))));
+  }
+  return prefix == "c8:47:8c" || prefix == "20:21:11";
+}
+
+bool advertisesJikongService(const NimBLEAdvertisedDevice *device) {
+  // 极空 BLE 模块广播 0xFFE0 服务（与连接阶段端点查找的 CommonServiceUuid 一致）
+  return advertisesService(device, AppConfig::Ble::CommonServiceUuid);
+}
+
 bool advertisedDeviceMatchesType(const NimBLEAdvertisedDevice *device,
                                   BmsType type) {
   if (device == nullptr) return false;
   const std::string name = device->haveName() ? device->getName() : std::string();
   if (isDeviceNameForType(name, type)) return true;
 
+  if (type == BmsType::Jikong) {
+    // 移植自 esphome-jk-bms：除名称外，
+    // ① 广播含 0xFFE0 服务（极空 BLE 模块标准服务）即视为极空；
+    // ② 极空模块固定 MAC OUI（C8:47:8C / 20:21:11）作为辅助判定。
+    if (advertisesJikongService(device)) return true;
+    return hasJikongMacOui(device->getAddress().toString());
+  }
   if (type == BmsType::Jiabaida) {
     return advertisesService(device, AppConfig::Ble::JiabaidaServiceUuid);
   }

@@ -14,6 +14,7 @@ class JkProtocolDecoder {
     Auto = 0,
     Jk02_24S,
     Jk02_32S,
+    Jk04,
   };
 
   JkProtocolDecoder(StatusCallback statusCallback,
@@ -38,6 +39,7 @@ class JkProtocolDecoder {
   void processFrame(const uint8_t *frame, size_t length);
   bool parseStatusFrame(const uint8_t *frame, size_t length, BmsData &data);
   Candidate parseStatusCandidate(const uint8_t *frame, Variant variant) const;
+  Candidate parseStatusJk04(const uint8_t *frame, Variant variant) const;
   bool parseDeviceInfoFrame(const uint8_t *frame,
                             size_t length,
                             char *hardwareVersion,
